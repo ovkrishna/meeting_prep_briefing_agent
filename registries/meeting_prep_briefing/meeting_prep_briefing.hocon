@@ -1,0 +1,195 @@
+{
+    "metadata": {
+        "description": "Meeting Prep Briefing Agent Network. Researches a company and a named contact ahead of a meeting, blends the findings with internal account context (kept out of the LLM prompt via sly_data), flags risks, and produces a ready-to-use briefing.",
+        "tags": ["AAOSA", "web-search", "sly_data", "meeting-prep", "citation-verification"],
+        "sample_queries": [
+            "I have a meeting with Sridhar Vembu from Zoho tomorrow. Prep me a briefing.",
+            "Give me a pre-meeting briefing for our call with a contact at Globex Industries."
+        ]
+    },
+
+    include "registries/aaosa.hocon",
+
+    "llm_config": {
+        "class": "anthropic",
+        "model_name": "claude-sonnet-5"
+    },
+
+    "max_steps": 40,
+    "max_execution_seconds": 300,
+
+    "tools": [
+        # ---- Front-man: the only agent that talks to the client ----
+        {
+            "name": "meeting_prep_briefing",
+            "function": {
+                "description": "I prepare a pre-meeting briefing on a company and a contact person, combining live research with internal account context, and flag risks worth knowing before the meeting.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "inquiry": {
+                            "type": "string",
+                            "description": "The meeting prep request, including the company name, the contact person's name, and any meeting context provided."
+                        }
+                    },
+                    "required": ["inquiry"]
+                }
+            },
+            "instructions": """
+You are the Meeting Prep Briefing front-man. You help a user prepare for an upcoming client or business meeting.
+
+When you receive an inquiry:
+1. Identify the company name and the contact person's name from the inquiry. If either is missing, ask the user for it before proceeding.
+2. Call `company_news_researcher` and `person_researcher` for the same inquiry. You do not need a response from one before calling the other.
+3. Call `account_context_specialist` with the company name to retrieve internal account context. This agent returns only a safe, bucketed summary (a deal-value band and a relationship-health label) -- it never returns raw financial figures or private contact details, by design.
+4. Call `risk_flagger`, passing along the company news, the person research, and the bucketed account context, and ask it to identify risks or sensitivities worth being aware of before the meeting.
+5. Once all responses are in, compose a single, well-organized briefing for the user with these sections:
+   - Company snapshot (recent news, notable developments)
+   - About the contact (public professional background)
+   - Account context (the safe, bucketed summary only)
+   - Risks and talking points to be mindful of
+   - Suggested conversation openers
+Preserve the source citations from the research you were given in the Company Snapshot and About the Contact sections, so the user can see where each claim came from. Carry forward any "single source" or "conflicting sources" notes rather than smoothing them away. Present this directly to the user in natural language. Do not mention your internal tools or agents by name.
+            """ ${aaosa_instructions},
+            "allow": {
+                "to_upstream": {
+                    "sly_data": {
+                        "deal_value_band": true
+                    }
+                }
+            },
+            "tools": ["company_news_researcher", "person_researcher", "account_context_specialist", "risk_flagger"]
+        },
+
+        # ---- Parallel research specialists ----
+        {
+            "name": "company_news_researcher",
+            "function": ${aaosa_call}{
+                "description": "Researches recent public news and developments about a company."
+            },
+            "instructions": """
+You research a company's recent public news: earnings, leadership changes, layoffs, product launches, M&A activity, or controversies.
+
+Follow this process exactly:
+1. Call `ddgs_search` with one or more relevant queries. Keep track of every "href" value returned across all your search calls -- this is your full list of known_urls.
+2. Draft your candidate findings as a list of claims, where each claim is an object: {"claim": "<factual statement>", "source_url": "<the href it came from>"}. Only draft a claim if you can name the exact href it came from. Summarize only what is relevant to someone about to meet with this company.
+3. Call `citation_filter` with your full "claims" list and your full "known_urls" list.
+4. Use ONLY the claims returned in "validated_claims" for your final answer -- these are the claims that were mechanically verified against your actual search results. Do not use any claim that citation_filter did not return, even if you personally believe it is accurate.
+5. In your final answer, write each validated claim as prose, with its source_url shown in parentheses right after it. If a claim only appeared in one search result, say so explicitly (e.g. "reported by a single source"). If two validated claims conflict, mention both and flag the conflict rather than picking one silently.
+
+If citation_filter discards most or all of your claims, report plainly that you could not find well-sourced information, rather than falling back to unverified statements.
+            """ ${aaosa_instructions},
+            "tools": ["ddgs_search", "citation_filter"]
+        },
+        {
+            "name": "person_researcher",
+            "function": ${aaosa_call}{
+                "description": "Researches a person's public professional background."
+            },
+            "instructions": """
+You research a named individual's public professional background: current role, career history, publicly stated interests, and any recent public statements relevant to a business meeting. Stick to publicly available professional information; do not speculate about personal matters.
+
+Follow this process exactly:
+1. Call `ddgs_search` with one or more relevant queries. Keep track of every "href" value returned across all your search calls -- this is your full list of known_urls.
+2. Draft your candidate findings as a list of claims, where each claim is an object: {"claim": "<factual statement>", "source_url": "<the href it came from>"}. Only draft a claim if you can name the exact href it came from.
+3. Call `citation_filter` with your full "claims" list and your full "known_urls" list.
+4. Use ONLY the claims returned in "validated_claims" for your final answer -- these are the claims that were mechanically verified against your actual search results. Do not use any claim that citation_filter did not return, even if you personally believe it is accurate.
+5. In your final answer, write each validated claim as prose, with its source_url shown in parentheses right after it. If a claim only appeared in one search result, say so explicitly (e.g. "reported by a single source"). If two validated claims conflict, mention both and flag the conflict rather than picking one silently.
+
+If citation_filter discards most or all of your claims, report plainly that you could not find well-sourced information, rather than falling back to unverified statements.
+            """ ${aaosa_instructions},
+            "tools": ["ddgs_search", "citation_filter"]
+        },
+        {
+            "name": "citation_filter",
+            "function": {
+                "description": "Verifies each claim's cited source URL against the actual URLs returned by search, and returns only the claims that are genuinely grounded.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "claims": {
+                            "type": "array",
+                            "description": "List of candidate claims to verify.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "claim": {"type": "string", "description": "The factual statement."},
+                                    "source_url": {"type": "string", "description": "The href it is claimed to come from."}
+                                },
+                                "required": ["claim", "source_url"]
+                            }
+                        },
+                        "known_urls": {
+                            "type": "array",
+                            "description": "Every href actually returned by this agent's ddgs_search calls.",
+                            "items": {"type": "string"}
+                        }
+                    },
+                    "required": ["claims", "known_urls"]
+                }
+            },
+            "class": "citation_filter.CitationFilter"
+        },
+        {
+            "name": "ddgs_search",
+            "toolbox": "ddgs_search"
+        },
+
+        # ---- Internal account context (sly_data demo) ----
+        {
+            "name": "account_context_specialist",
+            "function": ${aaosa_call}{
+                "description": "Retrieves internal account context (deal value band, relationship health) for a named company. Never returns raw financial figures or private contact details.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "company_name": {
+                            "type": "string",
+                            "description": "The name of the company to look up."
+                        }
+                    },
+                    "required": ["company_name"]
+                }
+            },
+            "instructions": "Call your tool with the company name and return its response as-is.",
+            "command": "Call the AccountContextTool with the company_name argument.",
+            "tools": ["AccountContextTool"]
+        },
+        {
+            "name": "AccountContextTool",
+            "function": {
+                "description": "Looks up internal account context for a company and returns only a safe, bucketed summary.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "company_name": {
+                            "type": "string",
+                            "description": "The name of the company to look up."
+                        }
+                    },
+                    "required": ["company_name"]
+                }
+            },
+            "class": "account_context_tool.AccountContextTool"
+        },
+
+        # ---- Risk / sensitivity analysis ----
+        {
+            "name": "risk_flagger",
+            "function": ${aaosa_call}{
+                "description": "Analyzes research findings and account context to flag risks and sensitivities ahead of a meeting."
+            },
+            "instructions": """
+You review company news, person research, and a bucketed account-health summary that you are given. You identify:
+- Any recent negative news that could come up in conversation
+- Any signal of a relationship or renewal risk
+- Any topic that would be tactless or risky to raise
+- Anything positive worth referencing early to build rapport
+Be concise and specific. If nothing significant stands out, say so plainly rather than inventing a risk.
+
+Preserve the source citations attached to any claim you rely on, and note explicitly if a risk you're flagging is based on a single-sourced or unconfirmed claim rather than a well-corroborated one -- the user should know how solid the basis for each flag is.
+            """ ${aaosa_instructions},
+            "tools": []
+        }
+    ]
+}
