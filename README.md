@@ -4,6 +4,8 @@ A [neuro-san](https://github.com/cognizant-ai-lab/neuro-san) agent network that 
 
 Give it a company and a contact name. It researches both in parallel, pulls internal account context safely, flags anything risky or sensitive, and hands back a ready-to-use briefing — including catching cases where the company and person don't actually match.
 
+> **📌 Where to look:** This repo includes the full `neuro-san-studio` framework this project is built on. **The project's own contribution is limited to two paths** — everything else is scaffolding needed to run it. Jump straight to [Files to review](#files-to-review) below.
+
 ---
 
 ## Example
@@ -12,6 +14,25 @@ Give it a company and a contact name. It researches both in parallel, pulls inte
 > "I have a meeting with Sridhar Vembu from Zoho tomorrow. Prep me a briefing."
 
 **Output:** a composed briefing with a company news snapshot, the contact's public background, internal account context (deal value band, relationship health), risks/sensitivities to be aware of, and a suggested conversation opener — each factual claim traceable to a real source URL.
+
+---
+
+## Files to review
+
+Everything specific to this project lives here — **4 files total**:
+
+```
+registries/meeting_prep_briefing/
+└── meeting_prep_briefing.hocon      ⭐ the network itself: all 5 agents,
+                                         their instructions, and how they're wired together
+
+coded_tools/meeting_prep_briefing/
+├── __init__.py                         package marker (no logic)
+├── account_context_tool.py          ⭐ sly_data-backed CRM lookup
+└── citation_filter.py               ⭐ URL-verified citation enforcement
+```
+
+The three ⭐ files are where all the actual design decisions live — the agent instructions, the sly_data boundary, and the citation-verification logic. Everything else in this repo (`neuro_san_studio/`, `apps/`, `docs/`, `tests/`, `servers/`, `middleware/`, etc.) is the underlying framework, unmodified, kept in place only so the project can be cloned and run without a separate install step.
 
 ---
 
@@ -42,7 +63,7 @@ Give it a company and a contact name. It researches both in parallel, pulls inte
                     for final composition
 ```
 
-### Reasoning agents (5)
+### Reasoning agents (5) — all defined in `meeting_prep_briefing.hocon`
 
 | Agent | Role |
 |---|---|
@@ -54,11 +75,11 @@ Give it a company and a contact name. It researches both in parallel, pulls inte
 
 ### Supporting tools (3)
 
-| Tool | Type | Role |
-|---|---|---|
-| `ddgs_search` | Toolbox tool | Live web search (no API key required), shared by both researchers. |
-| `citation_filter` | Coded tool (Python) | Mechanically verifies every claimed source URL against the URLs actually returned by search — discards any claim it can't verify, before it ever reaches the final briefing. |
-| `AccountContextTool` | Coded tool (Python) | Looks up a company's internal account record and returns only a safe, bucketed summary — the raw record never enters the LLM's context. |
+| Tool | Type | Defined in | Role |
+|---|---|---|---|
+| `ddgs_search` | Toolbox tool | framework (pre-built) | Live web search (no API key required), shared by both researchers. |
+| `citation_filter` | Coded tool (Python) | `coded_tools/meeting_prep_briefing/citation_filter.py` | Mechanically verifies every claimed source URL against the URLs actually returned by search — discards any claim it can't verify, before it ever reaches the final briefing. |
+| `AccountContextTool` | Coded tool (Python) | `coded_tools/meeting_prep_briefing/account_context_tool.py` | Looks up a company's internal account record and returns only a safe, bucketed summary — the raw record never enters the LLM's context. |
 
 ---
 
@@ -79,21 +100,6 @@ Give it a company and a contact name. It researches both in parallel, pulls inte
 - [neuro-san](https://github.com/cognizant-ai-lab/neuro-san) — multi-agent orchestration framework, AAOSA delegation protocol
 - Claude Sonnet — reasoning model for all agents
 - DuckDuckGo Search (`ddgs`) — live web search, no API key needed
-
----
-
-## Project structure
-
-```
-registries/
-└── meeting_prep_briefing/
-    └── meeting_prep_briefing.hocon   # network definition: agents, instructions, wiring
-coded_tools/
-└── meeting_prep_briefing/
-    ├── __init__.py
-    ├── account_context_tool.py       # sly_data-backed CRM lookup
-    └── citation_filter.py            # URL-verified citation enforcement
-```
 
 ---
 
