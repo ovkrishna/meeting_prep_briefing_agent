@@ -114,6 +114,11 @@ Then open the nsflow chat UI and try:
 
 ---
 
+## Working View
+
+<img width="1885" height="932" alt="image" src="https://github.com/user-attachments/assets/428e0d7c-8da2-4e12-a662-c55e3075d199" />
+
+
 ## Limitations
 
 - `citation_filter` verifies that a cited URL was genuinely returned by search — it does not verify that the page content actually supports the claim (that would require fetching and reading each page).
