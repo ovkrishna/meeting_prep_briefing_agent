@@ -106,7 +106,7 @@ The three ⭐ files are where all the actual design decisions live — the agent
 ## Running it
 
 ```bash
-python -m neuro_san_studio run
+ns run
 ```
 
 Then open the nsflow chat UI and try:
