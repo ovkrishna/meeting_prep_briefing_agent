@@ -125,7 +125,7 @@ source .venv/bin/activate
 ### 2. Install dependencies
 
 ```bash
-pip install -r requirements.txt
+uv add neuro-san-studio
 ```
 
 ### 3. Set your LLM API key
