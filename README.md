@@ -110,7 +110,8 @@ python -m neuro_san_studio run
 ```
 
 Then open the nsflow chat UI and try:
-> "I have a meeting with [contact name] from [company name] tomorrow. Prep me a briefing."
+> Under the Available Agents section -> select the meeting_prep_briefing/meeting_prep_briefing.
+> In the chat section, type, "I have a meeting with [contact name] from [company name] tomorrow. Prep me a briefing."
 
 ---
 
