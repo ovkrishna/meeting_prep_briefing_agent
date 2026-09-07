@@ -153,6 +153,9 @@ This starts the neuro-san server (`localhost:8080`) and the nsflow chat UI (`htt
 > "I have a meeting with [contact name] from [company name] tomorrow. Prep me a briefing."
 
 ---
+## Working view
+<img width="1885" height="932" alt="Working view" src="https://github.com/user-attachments/assets/32a0b6ec-6cfc-4c61-bad7-9d368b51d31e" />
+
 
 ## Limitations
 
