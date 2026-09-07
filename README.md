@@ -106,8 +106,6 @@ The three ⭐ files are where all the actual design decisions live — the agent
 ## Running it
 
 ```bash
-export AGENT_MANIFEST_FILE="./registries/manifest.hocon"
-export AGENT_TOOL_PATH="./coded_tools"
 python -m neuro_san_studio run
 ```
 
