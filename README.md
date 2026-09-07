@@ -4,7 +4,7 @@ A [neuro-san](https://github.com/cognizant-ai-lab/neuro-san) agent network that 
 
 Give it a company and a contact name. It researches both in parallel, pulls internal account context safely, flags anything risky or sensitive, and hands back a ready-to-use briefing — including catching cases where the company and person don't actually match.
 
-> **📌 Where to look:** This repo includes the full `neuro-san-studio` framework this project is built on. **The project's own contribution is limited to two paths** — everything else is scaffolding needed to run it. Jump straight to [Files to review](#files-to-review) below.
+> **📌 Where to look:** This repo includes the full `neuro-san-studio` framework this project is built on. **The project's own contribution is limited to a handful of files** — everything else is scaffolding needed to run it. Jump straight to [Files to review](#files-to-review) below.
 
 ---
 
@@ -19,17 +19,25 @@ Give it a company and a contact name. It researches both in parallel, pulls inte
 
 ## Files to review
 
-Everything specific to this project lives here — **4 files total**:
+Everything specific to this project lives here — **5 files total**:
 
 ```
 registries/meeting_prep_briefing/
 └── meeting_prep_briefing.hocon      ⭐ the network itself: all 5 agents,
                                          their instructions, and how they're wired together
 
+registries/manifest.hocon               1 line added (see below) to register
+                                         the network so the server serves it
+
 coded_tools/meeting_prep_briefing/
 ├── __init__.py                         package marker (no logic)
 ├── account_context_tool.py          ⭐ sly_data-backed CRM lookup
 └── citation_filter.py               ⭐ URL-verified citation enforcement
+```
+
+The only change in `registries/manifest.hocon` is this one line, added just before the file's closing `}`:
+```hocon
+"meeting_prep_briefing/meeting_prep_briefing.hocon": true,
 ```
 
 The three ⭐ files are where all the actual design decisions live — the agent instructions, the sly_data boundary, and the citation-verification logic. Everything else in this repo (`neuro_san_studio/`, `apps/`, `docs/`, `tests/`, `servers/`, `middleware/`, etc.) is the underlying framework, unmodified, kept in place only so the project can be cloned and run without a separate install step.
@@ -105,20 +113,46 @@ The three ⭐ files are where all the actual design decisions live — the agent
 
 ## Running it
 
+### 1. Clone and set up a virtual environment
+
+```bash
+git clone https://github.com/ovkrishna/meeting_prep_briefing_agent.git
+cd meeting_prep_briefing_agent
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 2. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Set your LLM API key
+
+This project uses Claude Sonnet, so set your Anthropic key (or add it to a `.env` file in the project root):
+
+```bash
+export ANTHROPIC_API_KEY="XXX"
+```
+
+Optionally verify it's picked up correctly:
+
+```bash
+ns check-llm-keys
+ns check-config
+```
+
+### 4. Start the server and UI
+
 ```bash
 ns run
 ```
 
-Then open the nsflow chat UI and try:
-> Under the Available Agents section -> select the meeting_prep_briefing/meeting_prep_briefing.
-> In the chat section, type, "I have a meeting with [contact name] from [company name] tomorrow. Prep me a briefing."
+This starts the neuro-san server (`localhost:8080`) and the nsflow chat UI (`http://localhost:4173/`). In the UI, select **meeting_prep_briefing** from the list of agent networks, then try:
+> "I have a meeting with [contact name] from [company name] tomorrow. Prep me a briefing."
 
 ---
-
-## Working View
-
-<img width="1885" height="932" alt="image" src="https://github.com/user-attachments/assets/428e0d7c-8da2-4e12-a662-c55e3075d199" />
-
 
 ## Limitations
 
